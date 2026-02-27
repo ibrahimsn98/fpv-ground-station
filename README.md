@@ -19,18 +19,6 @@ A budget-friendly, real-time FPV ground station built in Go with an embedded Rea
 - **Real-time updates** — WebSocket broadcast at 20 Hz (50 ms interval)
 - **Single binary** — web UI is embedded at compile time, just run and open the browser
 
-## How It Works
-
-```
-Flight Controller ──→ Serial (LTM) ──→ CLI ──→ Web Dashboard
-```
-
-1. **Serial port** — reads raw bytes from the serial connection (8N1, configurable baud rate)
-2. **LTM parser** — state machine decodes the LTM byte stream into typed telemetry frames
-3. **Telemetry store** — thread-safe in-memory store holds the latest state for each frame type
-4. **Broadcast loop** — every 50 ms, the current telemetry snapshot is JSON-encoded and pushed to all connected WebSocket clients
-5. **Web dashboard** — React app receives updates and renders flight instruments, map, and data panels
-
 ## Example Hardware Setup
 
 ```
