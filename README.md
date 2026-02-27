@@ -34,12 +34,12 @@ Flight Controller ──→ Serial (LTM) ──→ CLI ──→ Web Dashboard
 ## Example Hardware Setup
 
 ```
-                         Drone                                    Ground Station
+                         Drone                                  Ground Station
 
-┌────────────────────┐    UART   ┌──────────┐        ┌──────────┐  UART  ┌─────────┐  USB   ┌──────┐
-│ Flight Controller  ├──────────→│ E22 LoRa │)))  (((│ E22 LoRa ├───────→│ USB/TTL │───────→│  PC  │
-│ (INAV / Betaflight)│    LTM    └──────────┘   AIR  └──────────┘        └─────────┘        └──────┘
-└────────────────────┘                                                                  fpv-ground-station
+┌────────────────────┐    UART   ┌──────────┐        ┌──────────┐   UART    ┌────────┐  
+│ Flight Controller  ├──────────→│ E22 LoRa │)))  (((│ E22 LoRa ├──────────→│   PC   │
+│ (INAV / Betaflight)│    LTM    └──────────┘   AIR  └──────────┘  USB/TTL  └────────┘
+└────────────────────┘                                                  fpv-ground-station
 ```
 
 The flight controller outputs LTM on a spare UART. A pair of LoRa modules (e.g. EBYTE E22-900T) provides a long-range radio link. On the ground side, the LoRa module connects to the PC via a USB-to-TTL adapter. Ground Control reads from that serial port and serves the dashboard.
