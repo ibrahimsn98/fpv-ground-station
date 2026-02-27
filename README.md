@@ -52,8 +52,16 @@ This is just one example — any serial connection carrying LTM data will work (
 
 Download the latest binary from [Releases](https://github.com/ibrahimsn98/ground-control/releases), then:
 
+**macOS / Linux:**
+
 ```bash
 ./fpv-ground-station -port /dev/ttyUSB0 -baud 19200
+```
+
+**Windows (PowerShell):**
+
+```powershell
+.\fpv-ground-station-windows-amd64.exe -port COM3 -baud 19200
 ```
 
 Open [http://localhost:8080](http://localhost:8080) in your browser.
