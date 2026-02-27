@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react"
+import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import { MapContainer, TileLayer, Polyline, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
@@ -6,9 +6,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TelemetryContext } from "@/providers/telemetry-provider"
 import type { TelemetryMessage } from "@/types/telemetry"
-
-const MAX_TRACK = 2000
-const PRUNE_TO = 1000
 
 function createUAVIcon(heading: number) {
   const svg = `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
@@ -37,12 +34,17 @@ function createHomeIcon() {
   })
 }
 
-function MapUpdater() {
+function MapUpdater({
+  track,
+  setTrack,
+}: {
+  track: [number, number][]
+  setTrack: React.Dispatch<React.SetStateAction<[number, number][]>>
+}) {
   const map = useMap()
   const { subscribe } = useContext(TelemetryContext)
   const markerRef = useRef<L.Marker | null>(null)
   const homeMarkerRef = useRef<L.Marker | null>(null)
-  const [track, setTrack] = useState<[number, number][]>([])
   const hasCenter = useRef(false)
 
   useEffect(() => {
@@ -69,13 +71,7 @@ function MapUpdater() {
           hasCenter.current = true
         }
 
-        setTrack((prev) => {
-          const next = [...prev, [lat, lon] as [number, number]]
-          if (next.length > MAX_TRACK) {
-            return next.slice(next.length - PRUNE_TO)
-          }
-          return next
-        })
+        setTrack((prev) => [...prev, [lat, lon] as [number, number]])
       }
 
       // Update home position from Origin frame
@@ -90,7 +86,7 @@ function MapUpdater() {
         }
       }
     })
-  }, [subscribe, map])
+  }, [subscribe, map, setTrack])
 
   return track.length > 1 ? (
     <Polyline positions={track} color="#fbbf24" weight={2} opacity={0.7} />
@@ -101,6 +97,16 @@ export function MapPanel() {
   const { subscribe } = useContext(TelemetryContext)
   const [sats, setSats] = useState(0)
   const [fix, setFix] = useState(0)
+  const [track, setTrack] = useState<[number, number][]>([])
+
+  useEffect(() => {
+    fetch("/api/track")
+      .then((r) => r.json())
+      .then((points: [number, number][]) => {
+        if (points?.length) setTrack(points)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     return subscribe((msg) => {
@@ -110,6 +116,12 @@ export function MapPanel() {
       }
     })
   }, [subscribe])
+
+  const clearRoute = useCallback(() => {
+    fetch("/api/track", { method: "DELETE" })
+      .then(() => setTrack([]))
+      .catch(() => {})
+  }, [])
 
   const fixLabel = fix >= 2 ? (fix === 3 ? "3D" : "2D") : "No Fix"
   const fixVariant = fix >= 2 ? "default" : "destructive"
@@ -131,7 +143,7 @@ export function MapPanel() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             className="map-tiles"
           />
-          <MapUpdater />
+          <MapUpdater track={track} setTrack={setTrack} />
         </MapContainer>
         <div className="absolute top-2 left-2 z-[1000] flex items-center gap-2">
           <span className="text-[10px] font-medium uppercase tracking-wider text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
@@ -142,6 +154,12 @@ export function MapPanel() {
           </Badge>
           <span className="text-[10px] text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{sats} sats</span>
         </div>
+        <button
+          onClick={clearRoute}
+          className="absolute top-2 right-2 z-[1000] px-2 py-0.5 text-[10px] font-medium rounded bg-black/50 text-white/80 hover:bg-black/70 hover:text-white transition-colors backdrop-blur-sm"
+        >
+          Clear Route
+        </button>
       </CardContent>
     </Card>
   )

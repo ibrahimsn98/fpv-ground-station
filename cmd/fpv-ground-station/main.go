@@ -44,6 +44,12 @@ func main() {
 	store := &telemetry.Store{}
 	stats := telemetry.NewStats()
 
+	trackLog, err := telemetry.NewTrackLog("track.csv")
+	if err != nil {
+		log.Fatalf("open track log: %v", err)
+	}
+	defer trackLog.Close()
+
 	// Start web server
 	distFS, err := webDistFS()
 	if err != nil {
@@ -54,11 +60,12 @@ func main() {
 	}
 
 	srv := server.New(server.Config{
-		Store:   store,
-		Stats:   stats,
-		Addr:    *webAddr,
-		WebFS:   distFS,
-		DevMode: *devMode,
+		Store:    store,
+		Stats:    stats,
+		TrackLog: trackLog,
+		Addr:     *webAddr,
+		WebFS:    distFS,
+		DevMode:  *devMode,
 	})
 
 	go func() {
@@ -87,7 +94,7 @@ func main() {
 	}()
 
 	// Read LTM from serial port
-	readLTM(ctx, port, store, stats, *jsonOut)
+	readLTM(ctx, port, store, stats, trackLog, *jsonOut)
 
 	// Shutdown
 	port.Close()
@@ -115,7 +122,7 @@ func main() {
 	}
 }
 
-func readLTM(ctx context.Context, port *serial.Port, store *telemetry.Store, stats *telemetry.Stats, jsonOut bool) {
+func readLTM(ctx context.Context, port *serial.Port, store *telemetry.Store, stats *telemetry.Stats, trackLog *telemetry.TrackLog, jsonOut bool) {
 	enc := json.NewEncoder(os.Stdout)
 
 	parser := ltm.NewParser(
@@ -128,6 +135,10 @@ func readLTM(ctx context.Context, port *serial.Port, store *telemetry.Store, sta
 
 			store.Update(frame)
 			stats.Count(frame.Function)
+
+			if frame.GPS != nil && frame.GPS.Lat != 0 {
+				trackLog.Append(frame.GPS.Lat, frame.GPS.Lon)
+			}
 
 			if frame.Attitude != nil {
 				stats.AttitudeRx.Add(1)

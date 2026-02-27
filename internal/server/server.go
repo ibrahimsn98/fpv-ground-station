@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io/fs"
 	"log"
 	"net/http"
@@ -13,20 +14,22 @@ import (
 
 // Config configures the web server.
 type Config struct {
-	Store   *telemetry.Store
-	Stats   *telemetry.Stats
-	Addr    string
-	WebFS   fs.FS // embedded or nil in dev mode
-	DevMode bool
+	Store    *telemetry.Store
+	Stats    *telemetry.Stats
+	TrackLog *telemetry.TrackLog
+	Addr     string
+	WebFS    fs.FS // embedded or nil in dev mode
+	DevMode  bool
 }
 
 // Server serves the web UI and WebSocket telemetry.
 type Server struct {
-	store   *telemetry.Store
-	stats   *telemetry.Stats
-	addr    string
-	webFS   fs.FS
-	devMode bool
+	store    *telemetry.Store
+	stats    *telemetry.Stats
+	trackLog *telemetry.TrackLog
+	addr     string
+	webFS    fs.FS
+	devMode  bool
 
 	mu      sync.RWMutex
 	clients map[*client]struct{}
@@ -39,12 +42,13 @@ type client struct {
 // New creates a new Server.
 func New(cfg Config) *Server {
 	return &Server{
-		store:   cfg.Store,
-		stats:   cfg.Stats,
-		addr:    cfg.Addr,
-		webFS:   cfg.WebFS,
-		devMode: cfg.DevMode,
-		clients: make(map[*client]struct{}),
+		store:    cfg.Store,
+		stats:    cfg.Stats,
+		trackLog: cfg.TrackLog,
+		addr:     cfg.Addr,
+		webFS:    cfg.WebFS,
+		devMode:  cfg.DevMode,
+		clients:  make(map[*client]struct{}),
 	}
 }
 
@@ -53,6 +57,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/ws", s.handleWebSocket)
+	mux.HandleFunc("/api/track", s.handleTrack)
 
 	// SPA file serving (only if webFS is available)
 	if s.webFS != nil {
@@ -120,4 +125,32 @@ func (s *Server) removeClient(c *client) {
 	defer s.mu.Unlock()
 	delete(s.clients, c)
 	close(c.send)
+}
+
+func (s *Server) handleTrack(w http.ResponseWriter, r *http.Request) {
+	if s.trackLog == nil {
+		http.Error(w, "track log not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		points, err := s.trackLog.ReadAll()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(points)
+
+	case http.MethodDelete:
+		if err := s.trackLog.Clear(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
