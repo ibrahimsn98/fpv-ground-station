@@ -1,0 +1,11 @@
+# Binary
+bin/
+
+# IDE
+.idea/
+
+# Worktrees
+.worktrees/
+
+# Embedded dist for go:embed
+cmd/fpv-ground-station/dist/
